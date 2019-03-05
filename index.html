@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html ng-app="SmartMirror">
+
+<head>
+  <meta charset="utf-8">
+  <title>C.U.F.A Mirror</title>
+
+  <!-- Styles and Resources -->
+  <link rel="shortcut icon" href="favicon.ico" />
+  <link href='https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,800,700' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/weather-icons.css" />
+
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.8/angular.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.8/angular-animate.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.17.1/moment.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-moment/1.0.1/angular-moment.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.17.1/locale/es.js"></script>
+
+</head>
+
+<body ng-controller="MirrorCtrl">
+  <canvas id="inputCanvas" width="320" height="240" style="display:none"></canvas>
+  <video id="inputVideo" autoplay loop style="display:none"></video>
+  <div class="top">
+    <div class="top-left">
+      <div class="date grey"><span ng-bind="date.format('dddd')"></span>, <span ng-bind="date.format('LL')"></span></div>
+      <div class="time" ng-bind="date.format('LT')"></div>
+      <ul class="calendar fade" style="display: none">
+        <li class="event">
+          <div class="event-details">
+            <span class="day">
+            <span >Nombre inicial</span>
+            <span > - <span ></span>End Name</span>
+            </span>
+            <div class="details calendar-name" ></div>
+            <span class="summary" >Descripcion</span>
+            <div class="details" >
+              <span ><span ></span> <span ></span> - <span ></span> <span ></span></span>
+              <span ><span ></span> 13:00 - <span > 14:00</span></span>
+            </div>
+            <div class="details" >All day</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="top-right">
+      <div class="weather">
+        <div class="weather-today">
+          <span class="icon dimmed wi {{currentForecast.wi}}"></span>
+          <canvas id="icon_weather_current" width="90" height="70"></canvas>
+          <span class="temperature" ng-show="currentForecast.temperature" ng-bind="currentForecast.temperature + '&deg;'"></span>
+        </div>
+        <div class="weather-week-descriptor">
+          <span ng-bind="minutelyForecast.summary"></span>
+          <span ng-bind="hourlyForecast.summary"></span>
+          <span ng-bind="weeklyForecast.summary"></span>
+        </div>
+        <div class="weather-week" ng-repeat="forecast in weeklyForecast.data" ng-if="$index > 0">
+          <div class="weather-week-day">
+            <span class="day light-grey" ng-bind="forecast.day"></span>
+            <canvas id="icon_weather_{{forecast.counter}}" width="33" height="25"></canvas>
+            <span class="icon-small dimmed wi wi-fw {{forecast.wi}}"></span>
+            <span class="temperature temperature-min" ng-bind="forecast.temperatureMin + '&deg;'"></span>
+            <span class="temperature temperature-max" ng-bind="forecast.temperatureMax + '&deg;'"></span>
+          </div>
+        </div>
+        <!-- Workaround: -->
+        <div style="display: none;" ng-repeat="forecast in weeklyForecast.data" ng-if="$index > 0">
+          <span ng-init="iconLoad('icon_weather_'+forecast.counter, forecast.iconAnimation)"></span>
+        </div>
+      </div>
+      <div class="traffic" ng-repeat="traffic in trips">
+        <div ng-show="!traffic.error" class="traffic-information">
+          <span class="time-to" ng-bind="traffic.name"></span>
+          <span ng-bind="traffic.duration.humanize()"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="container">
+    <div class="middle-center">
+      <h1 ng-bind="greeting" ng-show="focus == 'sleep' "></h1>
+      <div class="contents-box video-container animate-grow" ng-show="focus == 'video'">
+        <iframe class="video animate-grow" ng-src="{{ondemandVideo}}" /></iframe>
+      </div>
+      <div class="contents-box map animate-grow" ng-show="focus == 'map'">
+        <img class="contents map animate-grow" ng-src="{{map}}" />
+      </div>
+    </div>
+
+    <div class="bottom-center">
+      <!-- Command list -->
+      <div class="commands animate-grow" ng-if="focus == 'commands'">
+        <h2 ng-bind="commands.title"></h2>
+        <dl>
+          <dt ng-repeat-start="command in commands" ng-bind="command['text']"></dt>
+          <dd ng-repeat-end ng-bind="command['description']"></dd>
+        </dl>
+      </div>
+
+      <div class="news">
+        <div class="fade">
+          <div class="news-title dimmed fade">
+            <span><i class="fa fa-rss fade" style="margin-right: 5px";></i></span>
+            <span fade> <span ng-bind="news.title"></span>, (<span ng-bind="news.lastUpdated.format('MMM DD, h:mm')"></span>)</span>
+          </div>
+          <div class="news-content fade">
+            <span class="fade" ng-bind="news.content"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="error" ng-bind="speechError" ng-show="speechError"></div>
+      <div class="partial-result" ng-bind="partialResult" ng-hide="speechError"></div>
+    </div>    
+    
+    <div class="bottom-left">
+      <div class="playing-track">
+        <img ng-src="{{track.cover}}" />
+        <div>{{track.artist}}</div>
+        <div>{{track.title}}</div>
+        <div>{{track.album}}</div>
+        <div class="nowplaying" ng-show="track.playing">Playing</div>
+      </div>
+    </div>
+
+    <div class="bottom-right">
+      <!-- Someday something will live here -->
+    </div>
+    <div class="colors animate-grow" ng-show="focus == 'colors'">
+      <div class="color-block" style="background-color:black"></div>
+    </div>
+  </div>
+  <!-- Sleep cover -->
+  <div class="sleep-cover fade" ng-hide="isReady">
+    <h2 class="middle-center" ng-bind="offline"></h2>
+  </div>
+
+  <script src="js/locales/es.js"></script>
+  <script src="js/env.js"></script>
+  <script src="js/inc/skycons.js"></script>
+  <script src="js/inc/headtrackr.js"></script>
+  <script src="js/inc/artyom.min.js"></script>
+  <script src="js/myApp.js"></script>
+  <script src="js/myCtrl.js"></script>
+  <script src="js/services/debug.js"></script>
+  <script src="js/services/weather.js"></script>
+  <script src="js/services/rss.js"></script>
+  <script src="js/services/timebox.js"></script>
+  <script src="js/services/traffic.js"></script>
+  <script src="js/services/map.js"></script>
+  <script src="js/services/ai.js"></script>
+  <script src="js/services/search.js"></script>
+
+</body>
+
+</html>
